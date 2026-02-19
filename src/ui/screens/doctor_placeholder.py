@@ -102,8 +102,11 @@ class DoctorPlaceholderScreen(DarkScreen):
         if self._filter == "all":
             return self._appointments
         if self._filter == "past":
-            return [item for item in self._appointments if item.dt < now]
-        return [item for item in self._appointments if item.dt >= now]
+            return [
+                item for item in self._appointments
+                if item.status == AppointmentStatus.COMPLETED or item.status == AppointmentStatus.CANCELLED
+            ]
+        return [item for item in self._appointments if item.status == AppointmentStatus.SCHEDULED]
 
     def _render_appointments(self):
         self.list_layout.clear_widgets()
