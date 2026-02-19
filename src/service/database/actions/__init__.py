@@ -1,4 +1,5 @@
 from src.service.database.actions.actions import (
+    DoctorView,
     login_user,
     register_patient,
     get_doctors,
@@ -12,6 +13,7 @@ from src.service.database.actions.actions import (
 )
 
 __all__ = [
+    "DoctorView",
     "login_user",
     "register_patient",
     "get_doctors",

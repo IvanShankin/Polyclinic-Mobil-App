@@ -105,16 +105,33 @@ async def create_doctor(login: str, password: str, fio: str, specialization: str
             raise ServiceError("Логин уже занят")
 
 
-async def update_doctor(doctor_id: int, fio: str, specialization: str) -> None:
+async def update_doctor(
+    doctor_id: int,
+    fio: str,
+    specialization: str,
+    login: str | None = None,
+    password: str | None = None,
+) -> None:
     async with get_db() as db:
-        result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
+        result = await db.execute(select(Doctor).options(selectinload(Doctor.user)).where(Doctor.id == doctor_id))
         doctor = result.scalar_one_or_none()
         if doctor is None:
             raise ServiceError("Врач не найден")
 
         doctor.fio = fio.strip()
         doctor.specialization = specialization.strip()
-        await db.commit()
+
+        if login is not None and login.strip():
+            doctor.user.login = login.strip()
+
+        if password is not None and password.strip():
+            doctor.user.password = hash_password(password.strip())
+
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise ServiceError("Логин уже занят")
 
 
 async def delete_doctor(doctor_id: int) -> None:
@@ -125,6 +142,7 @@ async def delete_doctor(doctor_id: int) -> None:
             raise ServiceError("Врач не найден")
 
         user_id = doctor.user_id
+        await db.execute(delete(Doctor).where(Doctor.id == doctor_id))
         await db.execute(delete(User).where(User.id == user_id))
         await db.commit()
 
