@@ -9,7 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from src.service.database.core.database import get_db
-from src.service.database.models import User, StorageStatus, Doctor, Patient, Appointment
+from src.service.database.models import (
+    User,
+    StorageStatus,
+    Doctor,
+    Patient,
+    Appointment,
+    AppointmentStatus,
+)
 from src.service.exeptions import ServiceError
 
 
@@ -33,6 +40,11 @@ class AppointmentView:
     doctor_fio: str
     patient_fio: str
     dt: datetime
+    status: AppointmentStatus
+    complaint: str
+    condition: str
+    conclusion: str
+
 
 
 def hash_password(password: str) -> str:
@@ -168,7 +180,17 @@ async def create_appointment(patient_user_id: int, doctor_id: int, dt: datetime)
         if occupied.scalar_one_or_none() is not None:
             raise ServiceError("Выбранное время занято")
 
-        db.add(Appointment(doctor_id=doctor_id, patient_id=patient.id, datetime=dt))
+        db.add(
+            Appointment(
+                doctor_id=doctor_id,
+                patient_id=patient.id,
+                datetime=dt,
+                complaint="",
+                condition="",
+                conclusion="",
+                status=AppointmentStatus.SCHEDULED,
+            )
+        )
         await db.commit()
 
 
@@ -193,6 +215,10 @@ async def get_patient_appointments(patient_user_id: int) -> list[AppointmentView
                 doctor_fio=a.doctor.fio,
                 patient_fio=a.patient.fio,
                 dt=a.datetime,
+                status=a.status,
+                complaint=a.complaint or "",
+                condition=a.condition or "",
+                conclusion=a.conclusion or "",
             )
             for a in appointments
         ]
@@ -219,9 +245,75 @@ async def get_doctor_appointments(doctor_user_id: int) -> list[AppointmentView]:
                 doctor_fio=a.doctor.fio,
                 patient_fio=a.patient.fio,
                 dt=a.datetime,
+                status=a.status,
+                complaint=a.complaint or "",
+                condition=a.condition or "",
+                conclusion=a.conclusion or "",
             )
             for a in appointments
         ]
+
+
+
+
+async def get_appointments_by_doctor_id(doctor_id: int) -> list[AppointmentView]:
+    async with get_db() as db:
+        doctor_result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
+        doctor = doctor_result.scalar_one_or_none()
+        if doctor is None:
+            raise ServiceError("Врач не найден")
+
+        result = await db.execute(
+            select(Appointment)
+            .options(selectinload(Appointment.patient), selectinload(Appointment.doctor))
+            .where(Appointment.doctor_id == doctor.id)
+            .order_by(Appointment.datetime.asc())
+        )
+        appointments = result.scalars().all()
+
+        return [
+            AppointmentView(
+                id=a.id,
+                doctor_fio=a.doctor.fio,
+                patient_fio=a.patient.fio,
+                dt=a.datetime,
+                status=a.status,
+                complaint=a.complaint or "",
+                condition=a.condition or "",
+                conclusion=a.conclusion or "",
+            )
+            for a in appointments
+        ]
+
+async def update_appointment_by_doctor(
+    doctor_user_id: int,
+    appointment_id: int,
+    complaint: str,
+    condition: str,
+    conclusion: str,
+    status: AppointmentStatus,
+) -> None:
+    async with get_db() as db:
+        doctor_result = await db.execute(select(Doctor).where(Doctor.user_id == doctor_user_id))
+        doctor = doctor_result.scalar_one_or_none()
+        if doctor is None:
+            raise ServiceError("Врач не найден")
+
+        appointment_result = await db.execute(
+            select(Appointment).where(
+                Appointment.id == appointment_id,
+                Appointment.doctor_id == doctor.id,
+            )
+        )
+        appointment = appointment_result.scalar_one_or_none()
+        if appointment is None:
+            raise ServiceError("Прием не найден")
+
+        appointment.complaint = complaint.strip()
+        appointment.condition = condition.strip()
+        appointment.conclusion = conclusion.strip()
+        appointment.status = status
+        await db.commit()
 
 
 def parse_datetime(raw: str) -> datetime:

@@ -13,6 +13,12 @@ class StorageStatus(enum.Enum):
     DELETED = "deleted"
 
 
+class AppointmentStatus(enum.Enum):
+    SCHEDULED = "scheduled"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
 class User(Base):
     __tablename__ = "User"
 
@@ -66,8 +72,19 @@ class Appointment(Base):
     doctor_id = Column(Integer, ForeignKey("Doctor.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     patient_id = Column(Integer, ForeignKey("Patient.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     datetime = Column(DateTime, nullable=False)
+    complaint = Column(String, nullable=True)
+    condition = Column(String, nullable=True)
+    conclusion = Column(String, nullable=True)
+    status = Column(
+        Enum(
+            AppointmentStatus,
+            values_callable=lambda x: [e.value for e in x],
+            name="appointment_status",
+        ),
+        nullable=False,
+        default=AppointmentStatus.SCHEDULED,
+    )
 
     # Связи
     doctor = relationship("Doctor", back_populates="appointments")
     patient = relationship("Patient", back_populates="appointments")
-
