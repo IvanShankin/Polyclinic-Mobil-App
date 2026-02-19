@@ -1,3 +1,5 @@
+import asyncio
+
 from src.service.models.conf_model import Config
 
 _config: Config = None
@@ -5,7 +7,11 @@ _config: Config = None
 
 def init_conf():
     global _config
-    _config = Config()
+    async_loop = asyncio.new_event_loop()
+
+    _config = Config(
+        global_event_loop=async_loop
+    )
 
 
 def set_config(conf: Config):
