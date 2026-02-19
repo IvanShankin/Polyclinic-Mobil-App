@@ -8,7 +8,8 @@ from kivy.uix.screenmanager import FadeTransition
 from src.config import get_config
 from src.service.utils.event_loop import start_loop
 from src.ui.screens.auth import AuthScreen, RegisterScreen
-from src.ui.screens.doctor_directory import DoctorDirectoryScreen, DoctorPlaceholderScreen
+from src.ui.screens.doctor_directory import DoctorDirectoryScreen
+from src.ui.screens.doctor_placeholder import DoctorPlaceholderScreen
 from src.ui.screens.screen_manager import RootScreenManager
 from src.service.database.models import StorageStatus
 
