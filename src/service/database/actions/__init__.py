@@ -1,5 +1,6 @@
 from src.service.database.actions.actions import (
     DoctorView,
+    AppointmentView,
     login_user,
     register_patient,
     get_doctors,
@@ -10,10 +11,13 @@ from src.service.database.actions.actions import (
     create_appointment,
     get_patient_appointments,
     get_doctor_appointments,
+    get_appointments_by_doctor_id,
+    update_appointment_by_doctor,
 )
 
 __all__ = [
     "DoctorView",
+    "AppointmentView",
     "login_user",
     "register_patient",
     "get_doctors",
@@ -24,4 +28,6 @@ __all__ = [
     "create_appointment",
     "get_patient_appointments",
     "get_doctor_appointments",
+    "get_appointments_by_doctor_id",
+    "update_appointment_by_doctor",
 ]

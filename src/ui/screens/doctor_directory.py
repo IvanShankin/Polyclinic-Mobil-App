@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -9,16 +11,27 @@ from kivy.uix.textinput import TextInput
 
 from src.config import get_config
 from src.service.database.actions import (
+    AppointmentView,
     DoctorView,
+    create_appointment,
     create_doctor,
     delete_doctor,
+    get_appointments_by_doctor_id,
     get_doctors,
+    get_patient_appointments,
+    parse_datetime,
     update_doctor,
 )
-from src.service.database.models import StorageStatus
+from src.service.database.models import AppointmentStatus, StorageStatus
 from src.ui.screens.base import DarkScreen
 from src.ui.screens.modal_window.modal_with_ok import show_modal
 from src.ui.screens.modal_window.modal_yes_or_no import show_confirm_modal
+
+STATUS_LABELS = {
+    AppointmentStatus.SCHEDULED: "Запланирован",
+    AppointmentStatus.COMPLETED: "Завершён",
+    AppointmentStatus.CANCELLED: "Отменён",
+}
 
 
 class DoctorDirectoryScreen(DarkScreen):
@@ -42,12 +55,7 @@ class DoctorDirectoryScreen(DarkScreen):
         anchor = AnchorLayout(anchor_x="center", anchor_y="top", padding=16)
         self.add_widget(anchor)
 
-        container = BoxLayout(
-            orientation="vertical",
-            spacing=12,
-            padding=16,
-            size_hint=(0.95, 0.96),
-        )
+        container = BoxLayout(orientation="vertical", spacing=12, padding=16, size_hint=(0.95, 0.96))
         anchor.add_widget(container)
 
         top_bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=36, spacing=8)
@@ -70,14 +78,7 @@ class DoctorDirectoryScreen(DarkScreen):
             on_press=lambda *_: self.refresh(),
         )
         top_bar.add_widget(self.logout_btn)
-        top_bar.add_widget(
-            Label(
-                text=title,
-                font_size="24sp",
-                bold=True,
-                color=self.conf.text_color,
-            )
-        )
+        top_bar.add_widget(Label(text=title, font_size="24sp", bold=True, color=self.conf.text_color))
         top_bar.add_widget(self.refresh_btn)
         container.add_widget(top_bar)
 
@@ -138,23 +139,31 @@ class DoctorDirectoryScreen(DarkScreen):
                 disabled=True,
                 on_press=lambda *_: self._confirm_delete(),
             )
+            self.btn_appointments = Button(
+                text="Записи выбранного врача",
+                background_color=self.conf.secondary_btn,
+                color=self.conf.text_color,
+                disabled=True,
+                on_press=lambda *_: self._open_admin_doctor_appointments(),
+            )
             self.action_row.add_widget(self.btn_add)
             self.action_row.add_widget(self.btn_edit)
             self.action_row.add_widget(self.btn_delete)
+            self.action_row.add_widget(self.btn_appointments)
         else:
             self.btn_book = Button(
                 text="Записаться на приём",
                 background_color=self.conf.primary_btn,
                 color=self.conf.text_color,
                 disabled=True,
-                on_press=lambda *_: show_modal("Экран записи будет добавлен следующим шагом."),
+                on_press=lambda *_: self._open_book_modal(),
             )
             self.btn_my_appointments = Button(
-                text="Мои записи",
+                text="Все мои записи на приём",
                 background_color=self.conf.secondary_btn,
                 color=self.conf.text_color,
-                disabled=True,
-                on_press=lambda *_: show_modal("Экран списка записей будет добавлен следующим шагом."),
+                disabled=False,
+                on_press=lambda *_: self._open_patient_appointments(),
             )
             self.action_row.add_widget(self.btn_book)
             self.action_row.add_widget(self.btn_my_appointments)
@@ -200,24 +209,13 @@ class DoctorDirectoryScreen(DarkScreen):
 
         if not doctors:
             self.doctors_layout.add_widget(
-                Label(
-                    text="Врачи не найдены",
-                    color=self.conf.hint_color,
-                    size_hint_y=None,
-                    height=40,
-                )
+                Label(text="Врачи не найдены", color=self.conf.hint_color, size_hint_y=None, height=40)
             )
             self._update_action_buttons_state()
             return
 
         for doctor in doctors:
-            card = BoxLayout(
-                orientation="vertical",
-                spacing=4,
-                padding=10,
-                size_hint_y=None,
-                height=92,
-            )
+            card = BoxLayout(orientation="vertical", spacing=4, padding=10, size_hint_y=None, height=92)
             select_btn = Button(
                 text=f"ФИО: {doctor.fio}\nСпециализация: {doctor.specialization}",
                 halign="left",
@@ -253,9 +251,129 @@ class DoctorDirectoryScreen(DarkScreen):
         if self.role == StorageStatus.ADMIN:
             self.btn_edit.disabled = not selected
             self.btn_delete.disabled = not selected
+            self.btn_appointments.disabled = not selected
         else:
             self.btn_book.disabled = not selected
-            self.btn_my_appointments.disabled = not selected
+            self.btn_my_appointments.disabled = False
+
+    def _open_book_modal(self):
+        doctor = self._selected_doctor()
+        if doctor is None:
+            show_modal("Выберите врача")
+            return
+
+        modal = ModalView(size_hint=(0.75, 0.42), auto_dismiss=False)
+        root = BoxLayout(orientation="vertical", padding=16, spacing=10)
+        root.add_widget(Label(text=f"Запись к врачу: {doctor.fio}", color=self.conf.text_color, size_hint_y=None, height=32))
+        dt_input = TextInput(
+            hint_text="Дата и время (ГГГГ-ММ-ДД ЧЧ:ММ)",
+            multiline=False,
+            size_hint_y=None,
+            height=44,
+            text=(datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M"),
+        )
+        root.add_widget(dt_input)
+
+        actions = BoxLayout(orientation="horizontal", spacing=8, size_hint_y=None, height=44)
+
+        def submit(*_):
+            try:
+                dt = parse_datetime(dt_input.text)
+            except Exception as e:
+                show_modal(f"Ошибка: {e}")
+                return
+
+            self.run_async(
+                create_appointment(self.manager.current_user_id, doctor.id, dt),
+                lambda *_: self._after_patient_book(modal),
+                lambda msg: show_modal(msg),
+            )
+
+        actions.add_widget(
+            Button(
+                text="Записаться",
+                on_press=submit,
+                background_color=self.conf.primary_btn,
+                color=self.conf.text_color,
+            )
+        )
+        actions.add_widget(
+            Button(
+                text="Отмена",
+                on_press=lambda *_: modal.dismiss(),
+                background_color=self.conf.secondary_btn,
+                color=self.conf.text_color,
+            )
+        )
+        root.add_widget(actions)
+        modal.add_widget(root)
+        modal.open()
+
+    def _after_patient_book(self, modal: ModalView):
+        modal.dismiss()
+        show_modal("Вы успешно записаны")
+
+    def _open_patient_appointments(self):
+        self.run_async(
+            get_patient_appointments(self.manager.current_user_id),
+            lambda appointments: self._show_appointments_modal(appointments, "Мои приёмы", StorageStatus.PATIENT),
+            lambda msg: show_modal(msg),
+        )
+
+    def _open_admin_doctor_appointments(self):
+        doctor = self._selected_doctor()
+        if doctor is None:
+            show_modal("Выберите врача")
+            return
+
+        self.run_async(
+            get_appointments_by_doctor_id(doctor.id),
+            lambda appointments: self._show_appointments_modal(
+                appointments,
+                f"Приёмы врача: {doctor.fio}",
+                StorageStatus.ADMIN,
+            ),
+            lambda msg: show_modal(msg),
+        )
+
+    def _show_appointments_modal(self, appointments: list[AppointmentView], title: str, role: StorageStatus):
+        modal = ModalView(size_hint=(0.9, 0.85), auto_dismiss=False)
+        root = BoxLayout(orientation="vertical", spacing=10, padding=12)
+        root.add_widget(Label(text=title, color=self.conf.text_color, size_hint_y=None, height=34, font_size="20sp"))
+
+        scroll = ScrollView()
+        list_layout = BoxLayout(orientation="vertical", spacing=8, size_hint_y=None)
+        list_layout.bind(minimum_height=list_layout.setter("height"))
+        scroll.add_widget(list_layout)
+
+        if not appointments:
+            list_layout.add_widget(Label(text="Записей пока нет", color=self.conf.hint_color, size_hint_y=None, height=34))
+
+        for appointment in appointments:
+            status_label = STATUS_LABELS.get(appointment.status, appointment.status.value)
+            btn = Button(
+                text=f"{appointment.dt.strftime('%d.%m.%Y %H:%M')} | {appointment.doctor_fio} | {status_label}",
+                size_hint_y=None,
+                height=48,
+                background_color=self.conf.secondary_btn,
+                color=self.conf.text_color,
+                on_press=lambda _, a=appointment, r=role: self._open_appointment_details(a, r),
+            )
+            list_layout.add_widget(btn)
+
+        root.add_widget(scroll)
+        root.add_widget(
+            Button(
+                text="Закрыть",
+                size_hint_y=None,
+                height=44,
+                on_press=lambda *_: modal.dismiss(),
+                background_color=self.conf.secondary_btn,
+                color=self.conf.text_color,
+            )
+        )
+        modal.add_widget(root)
+        modal.open()
 
     def _open_doctor_form(self, doctor: DoctorView | None = None):
         is_edit = doctor is not None
@@ -271,21 +389,13 @@ class DoctorDirectoryScreen(DarkScreen):
             )
         )
 
-        login_input = TextInput(
-            hint_text="Логин",
-            multiline=False,
-            size_hint_y=None,
-            height=44,
-            disabled=False,
-            text="",
-        )
+        login_input = TextInput(hint_text="Логин", multiline=False, size_hint_y=None, height=44, text="")
         password_input = TextInput(
             hint_text="Пароль",
             multiline=False,
             password=True,
             size_hint_y=None,
             height=44,
-            disabled=False,
             text="",
         )
         fio_input = TextInput(
@@ -372,3 +482,8 @@ class DoctorDirectoryScreen(DarkScreen):
     def _after_delete(self):
         self.refresh()
         show_modal("Врач удален")
+
+    def _open_appointment_details(self, appointment: AppointmentView, role: StorageStatus):
+        from src.ui.screens.doctor_placeholder import open_appointment_modal
+
+        open_appointment_modal(parent=self, appointment=appointment, role=role, on_saved=None)
