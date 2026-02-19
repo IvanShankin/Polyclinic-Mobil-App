@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.modalview import ModalView
 from kivy.uix.scrollview import ScrollView
@@ -19,7 +20,6 @@ from src.service.database.actions import (
     get_appointments_by_doctor_id,
     get_doctors,
     get_patient_appointments,
-    parse_datetime,
     update_doctor,
 )
 from src.service.database.models import AppointmentStatus, StorageStatus
@@ -262,25 +262,120 @@ class DoctorDirectoryScreen(DarkScreen):
             show_modal("Выберите врача")
             return
 
-        modal = ModalView(size_hint=(0.75, 0.42), auto_dismiss=False)
+        self.run_async(
+            get_appointments_by_doctor_id(doctor.id),
+            lambda appointments: self._show_book_modal(doctor, appointments),
+            lambda msg: show_modal(msg),
+        )
+
+    def _show_book_modal(self, doctor: DoctorView, appointments: list[AppointmentView]):
+        modal = ModalView(size_hint=(0.82, 0.76), auto_dismiss=False)
         root = BoxLayout(orientation="vertical", padding=16, spacing=10)
         root.add_widget(Label(text=f"Запись к врачу: {doctor.fio}", color=self.conf.text_color, size_hint_y=None, height=32))
-        dt_input = TextInput(
-            hint_text="Дата и время (ГГГГ-ММ-ДД ЧЧ:ММ)",
-            multiline=False,
+        selected_date = {"value": datetime.now().date()}
+        selected_dt = {"value": None}
+
+        selected_label = Label(
+            text="Выберите время приёма",
+            color=self.conf.text_color,
             size_hint_y=None,
-            height=44,
-            text=(datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M"),
+            height=28,
         )
-        root.add_widget(dt_input)
+
+        root.add_widget(selected_label)
+
+        scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
+        slots_grid = GridLayout(cols=3, spacing=8, padding=4, size_hint_y=None)
+        slots_grid.bind(minimum_height=slots_grid.setter("height"))
+        scroll.add_widget(slots_grid)
+        root.add_widget(scroll)
+
+        day_row = BoxLayout(orientation="horizontal", spacing=8, size_hint_y=None, height=44)
+        day_label = Label(color=self.conf.text_color)
+
+        def fmt_time(value: datetime) -> str:
+            return value.strftime("%H:%M").lstrip("0")
+
+        def build_day_slots(day_value: date) -> list[datetime]:
+            day_start = datetime.combine(day_value, time(hour=7, minute=0))
+            day_end = datetime.combine(day_value, time(hour=16, minute=0))
+            slots: list[datetime] = []
+            current = day_start
+            while current <= day_end:
+                slots.append(current)
+                current += timedelta(minutes=30)
+            return slots
+
+        def refresh_slots():
+            slots_grid.clear_widgets()
+            day_value = selected_date["value"]
+            occupied_slots = {
+                appointment.dt
+                for appointment in appointments
+                if appointment.dt.date() == day_value
+            }
+            day_label.text = day_value.strftime("%d.%m.%Y")
+
+            if selected_dt["value"] is not None and selected_dt["value"].date() != day_value:
+                selected_dt["value"] = None
+                selected_label.text = "Выберите время приёма"
+
+            for slot in build_day_slots(day_value):
+                is_occupied = slot in occupied_slots
+
+                def choose_slot(_, dt=slot):
+                    selected_dt["value"] = dt
+                    selected_label.text = f"Выбрано: {dt.strftime('%d.%m.%Y')} {fmt_time(dt)}"
+
+                slot_btn = Button(
+                    text=fmt_time(slot),
+                    size_hint_y=None,
+                    height=56,
+                    disabled=is_occupied,
+                    background_color=(0.55, 0.2, 0.2, 1) if is_occupied else self.conf.secondary_btn,
+                    color=self.conf.text_color,
+                    on_press=choose_slot,
+                )
+                slots_grid.add_widget(slot_btn)
+
+        day_row.add_widget(
+            Button(
+                text="<",
+                size_hint_x=None,
+                width=56,
+                background_color=self.conf.secondary_btn,
+                color=self.conf.text_color,
+                on_press=lambda *_: (
+                    selected_date.__setitem__("value", selected_date["value"] - timedelta(days=1)),
+                    refresh_slots(),
+                ),
+            )
+        )
+        day_row.add_widget(day_label)
+        day_row.add_widget(
+            Button(
+                text=">",
+                size_hint_x=None,
+                width=56,
+                background_color=self.conf.secondary_btn,
+                color=self.conf.text_color,
+                on_press=lambda *_: (
+                    selected_date.__setitem__("value", selected_date["value"] + timedelta(days=1)),
+                    refresh_slots(),
+                ),
+            )
+        )
+        root.add_widget(day_row)
+
+        refresh_slots()
+
 
         actions = BoxLayout(orientation="horizontal", spacing=8, size_hint_y=None, height=44)
 
         def submit(*_):
-            try:
-                dt = parse_datetime(dt_input.text)
-            except Exception as e:
-                show_modal(f"Ошибка: {e}")
+            dt = selected_dt["value"]
+            if dt is None:
+                show_modal("Выберите время приёма")
                 return
 
             self.run_async(
