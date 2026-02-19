@@ -53,6 +53,9 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 async def register_patient(login: str, password: str, fio: str, phone: str) -> AuthPayload:
+    if not login or not password or not fio or not phone:
+        raise ServiceError("Переданы не все данные")
+
     async with get_db() as db:
         user = User(login=login.strip(), password=hash_password(password), role=StorageStatus.PATIENT)
         db.add(user)
