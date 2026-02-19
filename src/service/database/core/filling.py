@@ -4,6 +4,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import get_config
+from src.service.database.actions.actions import hash_password
 from src.service.database.core.database import Base, get_db
 from src.service.database.models import User, StorageStatus
 
@@ -59,7 +60,7 @@ async def _filling_only_one_admin():
         if not admins:
             new_admin = User(
                 login="admin",
-                password="admin",
+                password=hash_password("admin"),
                 role=StorageStatus.ADMIN
             )
             session_db.add(new_admin)
