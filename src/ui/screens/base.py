@@ -10,7 +10,6 @@ from kivy.uix.screenmanager import Screen
 
 from src.config import get_config
 from src.service.exeptions import ServiceError
-from src.ui.screens.modal_window.modal_with_ok import show_modal
 
 
 class BaseFormScreen(Screen):
@@ -32,11 +31,15 @@ class BaseFormScreen(Screen):
             try:
                 result = done.result()
             except ServiceError as e:
-                Clock.schedule_once(lambda dt, exc=e: on_error(f"Ошибка: {str(exc)}"))
+                if on_error:
+                    Clock.schedule_once(lambda dt, exc=e: on_error(f"Ошибка: {str(exc)}"))
+
                 return
             except Exception as e:
                 logging.exception("Исключение: ")
-                Clock.schedule_once(lambda dt, exc=e: on_error(f"Ошибка: {str(exc)}"))
+                if on_error:
+                    Clock.schedule_once(lambda dt, exc=e: on_error(f"Ошибка: {str(exc)}"))
+
                 return
 
 

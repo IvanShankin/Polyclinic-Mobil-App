@@ -254,8 +254,6 @@ async def get_doctor_appointments(doctor_user_id: int) -> list[AppointmentView]:
         ]
 
 
-
-
 async def get_appointments_by_doctor_id(doctor_id: int) -> list[AppointmentView]:
     async with get_db() as db:
         doctor_result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
@@ -284,6 +282,7 @@ async def get_appointments_by_doctor_id(doctor_id: int) -> list[AppointmentView]
             )
             for a in appointments
         ]
+
 
 async def update_appointment_by_doctor(
     doctor_user_id: int,

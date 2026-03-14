@@ -68,7 +68,7 @@ class AuthScreen(DarkScreen):
 
     def do_login(self, *_):
         self.set_message("Выполняется вход...")
-        self.run_async(login_user(self.login.text, self.password.text), self._after_login)
+        self.run_async(login_user(self.login.text, self.password.text), self._after_login, self._error_login)
 
     def _after_login(self, payload):
         sm: RootScreenManager = self.manager
@@ -84,6 +84,10 @@ class AuthScreen(DarkScreen):
         elif payload.role == StorageStatus.DOCTOR:
             sm.get_screen("doctor").refresh()
             sm.safe_switch("doctor")
+
+    def _error_login(self, error, **kwargs):
+        self.set_message(error)
+        show_modal(error)
 
     def to_register(self, *_):
         self.manager.safe_switch("register")

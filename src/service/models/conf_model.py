@@ -1,11 +1,29 @@
+import os
+import sys
 from asyncio import AbstractEventLoop
 from pathlib import Path
 from typing import Set
 
 from pydantic import BaseModel
 
+
+def get_base_dir() -> Path:
+    """
+    Возвращает правильную базовую директорию:
+    - dev режим → root_dir
+    - exe режим → папка где лежит exe
+    """
+    if getattr(sys, "frozen", False):
+        # exe режим
+        return Path(sys.executable).parent
+    else:
+        # dev режим
+        return Path(__file__).resolve().parents[3]
+
+
 class Config(BaseModel):
-    base: Path = Path(__file__).resolve().parents[3]
+    base: Path = get_base_dir()
+
     media: Path = base / "media"
     log_file: Path = media / "mobile_app.log"
     data_base_path: Path = media / "data_base.sqlite3"
@@ -25,5 +43,8 @@ class Config(BaseModel):
 
     @property
     def sqlite_url(self) -> str:
-        """Возвращает полный URL для асинхронного подключения SQLAlchemy"""
         return f"sqlite+aiosqlite:///{self.data_base_path}"
+
+
+# создаём папку media гарантированно
+os.makedirs(get_base_dir() / "media", exist_ok=True)
