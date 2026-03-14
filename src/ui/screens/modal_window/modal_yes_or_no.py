@@ -1,11 +1,12 @@
 from typing import Callable, Optional
 
-from kivy.uix.modalview import ModalView
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.label import Label
-from kivy.uix.button import Button
 from kivy.clock import Clock
+from kivy.metrics import dp, sp
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.modalview import ModalView
+from kivy.uix.scrollview import ScrollView
 
 
 def show_confirm_modal(
@@ -20,8 +21,8 @@ def show_confirm_modal(
 
     root = BoxLayout(
         orientation="vertical",
-        padding=20,
-        spacing=15
+        padding=dp(20),
+        spacing=dp(15)
     )
 
     # ===== Scrollable текст =====
@@ -32,19 +33,20 @@ def show_confirm_modal(
         size_hint_y=None,
         halign="left",
         valign="top",
+        font_size=sp(16),
     )
 
     label.bind(texture_size=lambda inst, val: setattr(inst, "height", val[1]))
-    scroll.bind(width=lambda inst, val: setattr(label, "text_size", (val - 20, None)))
+    scroll.bind(width=lambda inst, val: setattr(label, "text_size", (val - dp(20), None)))
 
     scroll.add_widget(label)
 
-    # ===== Кнопки =====
+    # ===== ������ =====
     buttons = BoxLayout(
         orientation="horizontal",
         size_hint_y=None,
-        height=45,
-        spacing=15
+        height=dp(45),
+        spacing=dp(15)
     )
 
     btn_yes = Button(
@@ -72,7 +74,7 @@ def show_confirm_modal(
     btn_yes.bind(on_release=yes_handler)
     btn_no.bind(on_release=no_handler)
 
-    # Поменяли порядок кнопок
+    # �������� ������� ������
     buttons.add_widget(btn_yes)
     buttons.add_widget(btn_no)
 
@@ -82,7 +84,7 @@ def show_confirm_modal(
     modal.add_widget(root)
 
     Clock.schedule_once(
-        lambda dt: setattr(label, "text_size", (scroll.width - 20, None))
+        lambda dt: setattr(label, "text_size", (scroll.width - dp(20), None))
     )
 
     modal.open()

@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from kivy.metrics import dp, sp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
@@ -30,8 +31,8 @@ class DoctorPlaceholderScreen(DarkScreen):
         self._appointments: list[AppointmentView] = []
         self._filter = "future"
 
-        layout = BoxLayout(orientation="vertical", padding=20, spacing=12)
-        top = BoxLayout(size_hint_y=None, height=44, spacing=8)
+        layout = BoxLayout(orientation="vertical", padding=dp(20), spacing=dp(12))
+        top = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
         top.add_widget(
             Button(
                 text="Выйти",
@@ -41,7 +42,7 @@ class DoctorPlaceholderScreen(DarkScreen):
                 on_press=lambda *_: self.manager.safe_switch("auth"),
             )
         )
-        top.add_widget(Label(text="Кабинет врача", color=self.conf.text_color, font_size="22sp"))
+        top.add_widget(Label(text="Кабинет врача", color=self.conf.text_color, font_size=sp(22)))
         top.add_widget(
             Button(
                 text="Обновить",
@@ -53,7 +54,7 @@ class DoctorPlaceholderScreen(DarkScreen):
         )
         layout.add_widget(top)
 
-        filters = BoxLayout(size_hint_y=None, height=42, spacing=8)
+        filters = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(8))
         self.filter_spinner = Spinner(
             text="Будущие приёмы",
             values=("Будущие приёмы", "Прошедшие приёмы", "Все приёмы"),
@@ -66,7 +67,7 @@ class DoctorPlaceholderScreen(DarkScreen):
         layout.add_widget(filters)
 
         scroll = ScrollView()
-        self.list_layout = BoxLayout(orientation="vertical", spacing=8, size_hint_y=None)
+        self.list_layout = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_y=None)
         self.list_layout.bind(minimum_height=self.list_layout.setter("height"))
         scroll.add_widget(self.list_layout)
         layout.add_widget(scroll)
@@ -125,13 +126,13 @@ class DoctorPlaceholderScreen(DarkScreen):
                     f"Пациент: {appointment.patient_fio} | Статус: {status_label}"
                 ),
                 size_hint_y=None,
-                height=72,
+                height=dp(72),
                 halign="left",
                 valign="middle",
                 background_color=self.conf.secondary_btn,
                 color=self.conf.text_color,
             )
-            btn.bind(size=lambda inst, _: setattr(inst, "text_size", (inst.width - 20, inst.height)))
+            btn.bind(size=lambda inst, _: setattr(inst, "text_size", (inst.width - dp(20), inst.height)))
             btn.bind(on_press=lambda _, a=appointment: self._open_details(a))
             self.list_layout.add_widget(btn)
 
@@ -147,11 +148,11 @@ class DoctorPlaceholderScreen(DarkScreen):
 def open_appointment_modal(parent, appointment: AppointmentView, role: StorageStatus, on_saved=None):
     conf = get_config()
     modal = ModalView(size_hint=(0.88, 0.9), auto_dismiss=False)
-    root = BoxLayout(orientation="vertical", spacing=8, padding=12)
-    root.add_widget(Label(text="Данные приёма", color=conf.text_color, font_size="20sp", size_hint_y=None, height=34))
-    root.add_widget(Label(text=f"Дата и время: {appointment.dt.strftime('%d.%m.%Y %H:%M')}", color=conf.text_color, size_hint_y=None, height=24))
-    root.add_widget(Label(text=f"Врач: {appointment.doctor_fio}", color=conf.text_color, size_hint_y=None, height=24))
-    root.add_widget(Label(text=f"Пациент: {appointment.patient_fio}", color=conf.text_color, size_hint_y=None, height=24))
+    root = BoxLayout(orientation="vertical", spacing=dp(8), padding=dp(12))
+    root.add_widget(Label(text="Данные приёма", color=conf.text_color, font_size=sp(20), size_hint_y=None, height=dp(34)))
+    root.add_widget(Label(text=f"Дата и время: {appointment.dt.strftime('%d.%m.%Y %H:%M')}", color=conf.text_color, size_hint_y=None, height=dp(24)))
+    root.add_widget(Label(text=f"Врач: {appointment.doctor_fio}", color=conf.text_color, size_hint_y=None, height=dp(24)))
+    root.add_widget(Label(text=f"Пациент: {appointment.patient_fio}", color=conf.text_color, size_hint_y=None, height=dp(24)))
 
     complaint = TextInput(text=appointment.complaint or "", hint_text="Жалобы пациента", multiline=True)
     condition = TextInput(text=appointment.condition or "", hint_text="Состояние пациента", multiline=True)
@@ -164,7 +165,7 @@ def open_appointment_modal(parent, appointment: AppointmentView, role: StorageSt
         background_color=conf.secondary_btn,
         color=conf.text_color,
         size_hint_y=None,
-        height=44,
+        height=dp(44),
     )
 
     can_edit = role == StorageStatus.DOCTOR
@@ -182,7 +183,7 @@ def open_appointment_modal(parent, appointment: AppointmentView, role: StorageSt
     root.add_widget(Label(text="Статус", color=conf.text_color, size_hint_y=None, height=24))
     root.add_widget(status)
 
-    actions = BoxLayout(size_hint_y=None, height=44, spacing=8)
+    actions = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
 
     if can_edit:
 
@@ -226,6 +227,7 @@ def open_appointment_modal(parent, appointment: AppointmentView, role: StorageSt
     root.add_widget(actions)
     modal.add_widget(root)
     modal.open()
+
 
 
 def _saved(modal: ModalView, on_saved):

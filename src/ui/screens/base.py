@@ -4,6 +4,7 @@ from concurrent.futures import Future
 
 from kivy.clock import Clock
 from kivy.graphics import Color, RoundedRectangle
+from kivy.metrics import dp, sp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.screenmanager import Screen
@@ -15,8 +16,8 @@ from src.service.exeptions import ServiceError
 class BaseFormScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.layout = BoxLayout(orientation="vertical", padding=20, spacing=10)
-        self.message = Label(size_hint_y=None, height=40)
+        self.layout = BoxLayout(orientation="vertical", padding=dp(20), spacing=dp(10))
+        self.message = Label(size_hint_y=None, height=dp(40))
         self.layout.add_widget(self.message)
         self.add_widget(self.layout)
 
