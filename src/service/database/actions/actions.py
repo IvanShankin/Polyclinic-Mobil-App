@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -53,6 +52,7 @@ def hash_password(password: str) -> str:
     return f"pbkdf2_sha256${salt.hex()}${key.hex()}"
 
 
+
 def verify_password(password: str, stored: str) -> bool:
     if stored.startswith("pbkdf2_sha256$"):
         _, salt_hex, hash_hex = stored.split("$", 2)
@@ -72,11 +72,11 @@ async def register_patient(login: str, password: str, fio: str, phone: str) -> A
         user = User(login=login.strip(), password=hash_password(password), role=StorageStatus.PATIENT)
         db.add(user)
         try:
-            await db.flush()
+            db.flush()
             db.add(Patient(user_id=user.id, fio=fio.strip(), phone=phone.strip()))
-            await db.commit()
+            db.commit()
         except IntegrityError:
-            await db.rollback()
+            db.rollback()
             raise ServiceError("Логин уже занят")
 
         return AuthPayload(user_id=user.id, role=user.role, login=user.login)
@@ -84,8 +84,7 @@ async def register_patient(login: str, password: str, fio: str, phone: str) -> A
 
 async def login_user(login: str, password: str) -> AuthPayload:
     async with get_db() as db:
-        result = await db.execute(select(User).where(User.login == login.strip()))
-        user = result.scalar_one_or_none()
+        user = db.query(User).filter(User.login == login.strip()).one_or_none()
 
         if user is None or user.role == StorageStatus.DELETED:
             raise ServiceError("Пользователь не найден")
@@ -98,8 +97,7 @@ async def login_user(login: str, password: str) -> AuthPayload:
 
 async def get_doctors() -> list[DoctorView]:
     async with get_db() as db:
-        result = await db.execute(select(Doctor).order_by(Doctor.fio.asc()))
-        doctors = result.scalars().all()
+        doctors = db.query(Doctor).order_by(Doctor.fio.asc()).all()
         return [DoctorView(id=d.id, fio=d.fio, specialization=d.specialization) for d in doctors]
 
 
@@ -109,11 +107,11 @@ async def create_doctor(login: str, password: str, fio: str, specialization: str
         db.add(user)
 
         try:
-            await db.flush()
+            db.flush()
             db.add(Doctor(user_id=user.id, fio=fio.strip(), specialization=specialization.strip()))
-            await db.commit()
+            db.commit()
         except IntegrityError:
-            await db.rollback()
+            db.rollback()
             raise ServiceError("Логин уже занят")
 
 
@@ -125,8 +123,12 @@ async def update_doctor(
     password: str | None = None,
 ) -> None:
     async with get_db() as db:
-        result = await db.execute(select(Doctor).options(selectinload(Doctor.user)).where(Doctor.id == doctor_id))
-        doctor = result.scalar_one_or_none()
+        doctor = (
+            db.query(Doctor)
+            .options(selectinload(Doctor.user))
+            .filter(Doctor.id == doctor_id)
+            .one_or_none()
+        )
         if doctor is None:
             raise ServiceError("Врач не найден")
 
@@ -140,44 +142,49 @@ async def update_doctor(
             doctor.user.password = hash_password(password.strip())
 
         try:
-            await db.commit()
+            db.commit()
         except IntegrityError:
-            await db.rollback()
+            db.rollback()
             raise ServiceError("Логин уже занят")
 
 
 async def delete_doctor(doctor_id: int) -> None:
     async with get_db() as db:
-        result = await db.execute(select(Doctor).options(selectinload(Doctor.user)).where(Doctor.id == doctor_id))
-        doctor = result.scalar_one_or_none()
+        doctor = (
+            db.query(Doctor)
+            .options(selectinload(Doctor.user))
+            .filter(Doctor.id == doctor_id)
+            .one_or_none()
+        )
         if doctor is None:
             raise ServiceError("Врач не найден")
 
-        user_id = doctor.user_id
-        await db.execute(delete(Doctor).where(Doctor.id == doctor_id))
-        await db.execute(delete(User).where(User.id == user_id))
-        await db.commit()
+        user = doctor.user
+        db.delete(doctor)
+        if user is not None:
+            db.delete(user)
+        db.commit()
 
 
 async def create_appointment(patient_user_id: int, doctor_id: int, dt: datetime) -> None:
     async with get_db() as db:
-        patient_result = await db.execute(select(Patient).where(Patient.user_id == patient_user_id))
-        patient = patient_result.scalar_one_or_none()
+        patient = db.query(Patient).filter(Patient.user_id == patient_user_id).one_or_none()
         if patient is None:
             raise ServiceError("Пациент не найден")
 
-        doctor_result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
-        doctor = doctor_result.scalar_one_or_none()
+        doctor = db.query(Doctor).filter(Doctor.id == doctor_id).one_or_none()
         if doctor is None:
             raise ServiceError("Врач не найден")
 
-        occupied = await db.execute(
-            select(Appointment).where(
+        occupied = (
+            db.query(Appointment)
+            .filter(
                 Appointment.doctor_id == doctor_id,
                 Appointment.datetime == dt,
             )
+            .one_or_none()
         )
-        if occupied.scalar_one_or_none() is not None:
+        if occupied is not None:
             raise ServiceError("Выбранное время занято")
 
         db.add(
@@ -191,23 +198,22 @@ async def create_appointment(patient_user_id: int, doctor_id: int, dt: datetime)
                 status=AppointmentStatus.SCHEDULED,
             )
         )
-        await db.commit()
+        db.commit()
 
 
 async def get_patient_appointments(patient_user_id: int) -> list[AppointmentView]:
     async with get_db() as db:
-        patient_result = await db.execute(select(Patient).where(Patient.user_id == patient_user_id))
-        patient = patient_result.scalar_one_or_none()
+        patient = db.query(Patient).filter(Patient.user_id == patient_user_id).one_or_none()
         if patient is None:
             raise ServiceError("Пациент не найден")
 
-        result = await db.execute(
-            select(Appointment)
+        appointments = (
+            db.query(Appointment)
             .options(selectinload(Appointment.doctor), selectinload(Appointment.patient))
-            .where(Appointment.patient_id == patient.id)
+            .filter(Appointment.patient_id == patient.id)
             .order_by(Appointment.datetime.asc())
+            .all()
         )
-        appointments = result.scalars().all()
 
         return [
             AppointmentView(
@@ -226,18 +232,17 @@ async def get_patient_appointments(patient_user_id: int) -> list[AppointmentView
 
 async def get_doctor_appointments(doctor_user_id: int) -> list[AppointmentView]:
     async with get_db() as db:
-        doctor_result = await db.execute(select(Doctor).where(Doctor.user_id == doctor_user_id))
-        doctor = doctor_result.scalar_one_or_none()
+        doctor = db.query(Doctor).filter(Doctor.user_id == doctor_user_id).one_or_none()
         if doctor is None:
             raise ServiceError("Врач не найден")
 
-        result = await db.execute(
-            select(Appointment)
+        appointments = (
+            db.query(Appointment)
             .options(selectinload(Appointment.patient), selectinload(Appointment.doctor))
-            .where(Appointment.doctor_id == doctor.id)
+            .filter(Appointment.doctor_id == doctor.id)
             .order_by(Appointment.datetime.asc())
+            .all()
         )
-        appointments = result.scalars().all()
 
         return [
             AppointmentView(
@@ -256,18 +261,17 @@ async def get_doctor_appointments(doctor_user_id: int) -> list[AppointmentView]:
 
 async def get_appointments_by_doctor_id(doctor_id: int) -> list[AppointmentView]:
     async with get_db() as db:
-        doctor_result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
-        doctor = doctor_result.scalar_one_or_none()
+        doctor = db.query(Doctor).filter(Doctor.id == doctor_id).one_or_none()
         if doctor is None:
             raise ServiceError("Врач не найден")
 
-        result = await db.execute(
-            select(Appointment)
+        appointments = (
+            db.query(Appointment)
             .options(selectinload(Appointment.patient), selectinload(Appointment.doctor))
-            .where(Appointment.doctor_id == doctor.id)
+            .filter(Appointment.doctor_id == doctor.id)
             .order_by(Appointment.datetime.asc())
+            .all()
         )
-        appointments = result.scalars().all()
 
         return [
             AppointmentView(
@@ -293,18 +297,18 @@ async def update_appointment_by_doctor(
     status: AppointmentStatus,
 ) -> None:
     async with get_db() as db:
-        doctor_result = await db.execute(select(Doctor).where(Doctor.user_id == doctor_user_id))
-        doctor = doctor_result.scalar_one_or_none()
+        doctor = db.query(Doctor).filter(Doctor.user_id == doctor_user_id).one_or_none()
         if doctor is None:
             raise ServiceError("Врач не найден")
 
-        appointment_result = await db.execute(
-            select(Appointment).where(
+        appointment = (
+            db.query(Appointment)
+            .filter(
                 Appointment.id == appointment_id,
                 Appointment.doctor_id == doctor.id,
             )
+            .one_or_none()
         )
-        appointment = appointment_result.scalar_one_or_none()
         if appointment is None:
             raise ServiceError("Прием не найден")
 
@@ -312,7 +316,8 @@ async def update_appointment_by_doctor(
         appointment.condition = condition.strip()
         appointment.conclusion = conclusion.strip()
         appointment.status = status
-        await db.commit()
+        db.commit()
+
 
 
 def parse_datetime(raw: str) -> datetime:

@@ -1,9 +1,13 @@
 from contextlib import asynccontextmanager
-from sqlalchemy import inspect
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from typing import Optional
+
+from sqlalchemy import create_engine, inspect
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 Base_sqlalchemy = declarative_base()
+_engine = None
+_session_factory: Optional[sessionmaker] = None
 
 class Base(Base_sqlalchemy):
     __abstract__ = True
@@ -11,16 +15,28 @@ class Base(Base_sqlalchemy):
     def to_dict(self):
         return {c.key: getattr(self, c.key) for c in inspect(self).mapper.column_attrs}
 
+def _get_engine():
+    global _engine, _session_factory
+    if _engine is None:
+        from src.config import get_config
+
+        conf = get_config()
+        _engine = create_engine(conf.sqlite_url, echo=True)
+        _session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
+
+    return _engine
+
+
+def _get_session() -> Session:
+    if _session_factory is None:
+        _get_engine()
+    return _session_factory()
+
+
 @asynccontextmanager
-async def get_db() -> AsyncSession:
-    from src.config import get_config
-
-    conf = get_config()
-    async_session_factory = sessionmaker(
-        create_async_engine(conf.sqlite_url, echo=True),
-        expire_on_commit=False,
-        class_=AsyncSession
-    )
-
-    async with async_session_factory() as session:
+async def get_db() -> Session:
+    session = _get_session()
+    try:
         yield session
+    finally:
+        session.close()

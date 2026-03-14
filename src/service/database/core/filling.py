@@ -1,7 +1,6 @@
 import logging
 
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine
 
 from src.config import get_config
 from src.service.database.actions.actions import hash_password
@@ -23,39 +22,36 @@ async def _create_database():
     Если файл существует — ничего не ломает.
     """
     conf = get_config()
-    engine = create_async_engine(conf.sqlite_url, echo=True)
+    engine = create_engine(conf.sqlite_url, echo=True)
 
     try:
-        async with engine.begin() as conn:
-            logging.info(f"Creating database tables at {conf.data_base_path}...")
-            await conn.run_sync(Base.metadata.create_all)
-            logging.info("Database tables created successfully")
+        logging.info(f"Creating database tables at {conf.data_base_path}...")
+        Base.metadata.create_all(engine)
+        logging.info("Database tables created successfully")
     except Exception as e:
         logging.error(f"Error creating tables: {e}")
         raise
     finally:
-        await engine.dispose()
+        engine.dispose()
 
 
 async def _create_table():
     """создает таблицы в целевой базе данных"""
-    engine = create_async_engine(get_config().sqlite_url)
+    engine = create_engine(get_config().sqlite_url)
     try:
-        async with engine.begin() as conn:
-            logging.info("Creating core tables...")
-            await conn.run_sync(Base.metadata.create_all)
-            logging.info("Database tables created successfully")
+        logging.info("Creating core tables...")
+        Base.metadata.create_all(engine)
+        logging.info("Database tables created successfully")
     except Exception as e:
         logging.error(f"Error creating tables: {e}")
         raise
     finally:
-        await engine.dispose()
+        engine.dispose()
 
 
 async def _filling_only_one_admin():
     async with get_db() as session_db:
-        result_db = await session_db.execute(select(User).where(User.role == StorageStatus.ADMIN))
-        admins = result_db.scalars().all()
+        admins = session_db.query(User).filter(User.role == StorageStatus.ADMIN).all()
 
         if not admins:
             new_admin = User(
@@ -65,4 +61,4 @@ async def _filling_only_one_admin():
             )
             session_db.add(new_admin)
 
-            await session_db.commit()
+            session_db.commit()

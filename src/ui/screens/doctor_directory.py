@@ -1,5 +1,4 @@
 from datetime import date, datetime, time, timedelta
-
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -45,12 +44,8 @@ class DoctorDirectoryScreen(DarkScreen):
         self._card_default_color = self.conf.secondary_btn
         self._card_selected_color = (0.45, 0.45, 0.55, 1)
 
-        if self.role == StorageStatus.ADMIN:
-            self.name = "admin"
-            title = "Панель администратора"
-        else:
-            self.name = "patient"
-            title = "Кабинет пациента"
+        self.name = "admin" if self.role == StorageStatus.ADMIN else "patient"
+        title = "Панель администратора" if self.role == StorageStatus.ADMIN else "Кабинет пациента"
 
         anchor = AnchorLayout(anchor_x="center", anchor_y="top", padding=16)
         self.add_widget(anchor)
@@ -58,30 +53,42 @@ class DoctorDirectoryScreen(DarkScreen):
         container = BoxLayout(orientation="vertical", spacing=12, padding=16, size_hint=(0.95, 0.96))
         anchor.add_widget(container)
 
+        # ===== Top bar =====
         top_bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=36, spacing=8)
         self.logout_btn = Button(
             text="Выйти",
-            size_hint=(None, None),
+            size_hint=(None, 1),
             width=100,
-            height=36,
             background_color=self.conf.secondary_btn,
             color=self.conf.text_color,
             on_press=lambda *_: self.manager.safe_switch("auth"),
         )
         self.refresh_btn = Button(
             text="Обновить",
-            size_hint=(None, None),
+            size_hint=(None, 1),
             width=110,
-            height=36,
             background_color=self.conf.primary_btn,
             color=self.conf.text_color,
             on_press=lambda *_: self.refresh(),
         )
+        self.title_label = Label(
+            text=title,
+            font_size="18sp",
+            bold=True,
+            color=self.conf.text_color,
+            size_hint_x=1,
+            halign="center",
+            valign="middle",
+            text_size=(None, 36),
+            shorten=True,
+            shorten_from="right"
+        )
         top_bar.add_widget(self.logout_btn)
-        top_bar.add_widget(Label(text=title, font_size="24sp", bold=True, color=self.conf.text_color))
+        top_bar.add_widget(self.title_label)
         top_bar.add_widget(self.refresh_btn)
         container.add_widget(top_bar)
 
+        # ===== Filter row =====
         filter_row = BoxLayout(orientation="horizontal", spacing=10, size_hint_y=None, height=44)
         filter_row.add_widget(
             Label(
@@ -103,15 +110,20 @@ class DoctorDirectoryScreen(DarkScreen):
         filter_row.add_widget(self.specialization_filter)
         container.add_widget(filter_row)
 
+        # ===== Doctors scroll =====
         scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
         self.doctors_layout = BoxLayout(orientation="vertical", spacing=10, size_hint_y=None)
         self.doctors_layout.bind(minimum_height=self.doctors_layout.setter("height"))
         scroll.add_widget(self.doctors_layout)
         container.add_widget(scroll)
 
-        self.action_row = BoxLayout(orientation="horizontal", spacing=8, size_hint_y=None, height=40)
+        # ===== Action buttons row с прокруткой =====
+        self.action_scroll = ScrollView(size_hint=(1, None), height=44, do_scroll_y=False)
+        self.action_row = BoxLayout(orientation="horizontal", spacing=8, size_hint=(None, 1))
+        self.action_row.bind(minimum_width=self.action_row.setter("width"))
+        self.action_scroll.add_widget(self.action_row)
+        container.add_widget(self.action_scroll)
         self._build_action_buttons()
-        container.add_widget(self.action_row)
 
     def on_pre_enter(self, *_):
         self.refresh()
@@ -121,12 +133,16 @@ class DoctorDirectoryScreen(DarkScreen):
         if self.role == StorageStatus.ADMIN:
             self.btn_add = Button(
                 text="Добавить врача",
+                size_hint=(None, 1),
+                width=140,
                 background_color=self.conf.primary_btn,
                 color=self.conf.text_color,
                 on_press=lambda *_: self._open_doctor_form(),
             )
             self.btn_edit = Button(
                 text="Изменить врача",
+                size_hint=(None, 1),
+                width=140,
                 background_color=self.conf.secondary_btn,
                 color=self.conf.text_color,
                 disabled=True,
@@ -134,25 +150,29 @@ class DoctorDirectoryScreen(DarkScreen):
             )
             self.btn_delete = Button(
                 text="Удалить врача",
+                size_hint=(None, 1),
+                width=140,
                 background_color=(0.7, 0.2, 0.2, 1),
                 color=self.conf.text_color,
                 disabled=True,
                 on_press=lambda *_: self._confirm_delete(),
             )
             self.btn_appointments = Button(
-                text="Записи выбранного врача",
+                text="Записи врача",
+                size_hint=(None, 1),
+                width=180,
                 background_color=self.conf.secondary_btn,
                 color=self.conf.text_color,
                 disabled=True,
                 on_press=lambda *_: self._open_admin_doctor_appointments(),
             )
-            self.action_row.add_widget(self.btn_add)
-            self.action_row.add_widget(self.btn_edit)
-            self.action_row.add_widget(self.btn_delete)
-            self.action_row.add_widget(self.btn_appointments)
+            for btn in [self.btn_add, self.btn_edit, self.btn_delete, self.btn_appointments]:
+                self.action_row.add_widget(btn)
         else:
             self.btn_book = Button(
                 text="Записаться на приём",
+                size_hint=(None, 1),
+                width=160,
                 background_color=self.conf.primary_btn,
                 color=self.conf.text_color,
                 disabled=True,
@@ -160,6 +180,8 @@ class DoctorDirectoryScreen(DarkScreen):
             )
             self.btn_my_appointments = Button(
                 text="Все мои записи на приём",
+                size_hint=(None, 1),
+                width=180,
                 background_color=self.conf.secondary_btn,
                 color=self.conf.text_color,
                 disabled=False,
@@ -167,6 +189,9 @@ class DoctorDirectoryScreen(DarkScreen):
             )
             self.action_row.add_widget(self.btn_book)
             self.action_row.add_widget(self.btn_my_appointments)
+
+    # ===== Остальной код остаётся без изменений =====
+    # методы refresh, _after_load, _load_error, _render_doctors, _select_doctor, _update_action_buttons_state и т.д.
 
     def refresh(self):
         self.selected_doctor_id = None

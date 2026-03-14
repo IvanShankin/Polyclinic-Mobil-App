@@ -2,7 +2,7 @@ import os
 import sys
 from asyncio import AbstractEventLoop
 from pathlib import Path
-from typing import Set
+from typing import Tuple
 
 from pydantic import BaseModel
 
@@ -30,20 +30,19 @@ class Config(BaseModel):
 
     global_event_loop: AbstractEventLoop
 
-    dark_bg: Set = (0.15, 0.15, 0.15, 1)
-    input_dg: Set = (0.25, 0.25, 0.25, 1)
-    primary_btn: Set = (0.3, 0.6, 0.9, 1)
-    secondary_btn: Set = (0.35, 0.35, 0.35, 1)
-    text_color: Set = (1, 1, 1, 1)
-    hint_color: Set = (0.7, 0.7, 0.7, 1)
+    dark_bg: Tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1)
+    input_dg: Tuple[float, float, float, float] = (0.25, 0.25, 0.25, 1)
+    primary_btn: Tuple[float, float, float, float] = (0.3, 0.6, 0.9, 1)
+    secondary_btn: Tuple[float, float, float, float] = (0.35, 0.35, 0.35, 1)
+    text_color: Tuple[float, float, float, float] = (1, 1, 1, 1)
+    hint_color: Tuple[float, float, float, float] = (0.7, 0.7, 0.7, 1)
 
-    model_config = {
-        "arbitrary_types_allowed": True,
-    }
+    class Config:
+        arbitrary_types_allowed = True
 
     @property
     def sqlite_url(self) -> str:
-        return f"sqlite+aiosqlite:///{self.data_base_path}"
+        return f"sqlite:///{self.data_base_path}"
 
 
 # создаём папку media гарантированно
