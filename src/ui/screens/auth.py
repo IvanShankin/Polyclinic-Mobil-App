@@ -63,7 +63,7 @@ class AuthScreen(DarkScreen):
         form.add_widget(Button(text="Войти", size_hint_y=None, height=dp(45),
                                background_color=self.conf.primary_btn, color=self.conf.text_color,
                                on_press=self.do_login))
-        form.add_widget(Button(text="Регистрация пациента", size_hint_y=None, height=45,
+        form.add_widget(Button(text="Регистрация пациента", size_hint_y=None, height=dp(45),
                                background_color=self.conf.secondary_btn, color=self.conf.text_color,
                                on_press=self.to_register))
 

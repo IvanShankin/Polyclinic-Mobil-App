@@ -47,7 +47,6 @@ class DoctorDirectoryScreen(DarkScreen):
         self._card_selected_color = (0.45, 0.45, 0.55, 1)
 
         self.name = "admin" if self.role == StorageStatus.ADMIN else "patient"
-        title = "Панель администратора" if self.role == StorageStatus.ADMIN else "Кабинет пациента"
 
         anchor = AnchorLayout(anchor_x="center", anchor_y="top", padding=dp(16))
         self.add_widget(anchor)
@@ -74,7 +73,7 @@ class DoctorDirectoryScreen(DarkScreen):
             on_press=lambda *_: self.refresh(),
         )
         self.title_label = Label(
-            text=title,
+            text=" ",
             font_size=sp(18),
             bold=True,
             color=self.conf.text_color,
@@ -233,7 +232,7 @@ class DoctorDirectoryScreen(DarkScreen):
 
         if not doctors:
             self.doctors_layout.add_widget(
-                Label(text="Врачи не найдены", color=self.conf.hint_color, size_hint_y=None, height=40)
+                Label(text="Врачи не найдены", color=self.conf.hint_color, size_hint_y=None, height=dp(40))
             )
             self._update_action_buttons_state()
             return
@@ -465,7 +464,7 @@ class DoctorDirectoryScreen(DarkScreen):
         scroll.add_widget(list_layout)
 
         if not appointments:
-            list_layout.add_widget(Label(text="Записей пока нет", color=self.conf.hint_color, size_hint_y=None, height=34))
+            list_layout.add_widget(Label(text="Записей пока нет", color=self.conf.hint_color, size_hint_y=None, height=dp(34)))
 
         for appointment in appointments:
             status_label = STATUS_LABELS.get(appointment.status, appointment.status.value)
@@ -495,8 +494,23 @@ class DoctorDirectoryScreen(DarkScreen):
 
     def _open_doctor_form(self, doctor: DoctorView | None = None):
         is_edit = doctor is not None
-        modal = ModalView(size_hint=(0.8, 0.65), auto_dismiss=False)
-        root = BoxLayout(orientation="vertical", padding=dp(16), spacing=dp(10))
+
+        modal = ModalView(
+            size_hint=(None, None),
+            auto_dismiss=False,
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+        )
+
+        root = BoxLayout(
+            orientation="vertical",
+            padding=dp(16),
+            spacing=dp(10),
+            size_hint=(None, None),
+            width=dp(400),
+        )
+
+        root.bind(minimum_height=root.setter("height"))
+
         root.add_widget(
             Label(
                 text="Изменение врача" if is_edit else "Добавление врача",
@@ -504,18 +518,25 @@ class DoctorDirectoryScreen(DarkScreen):
                 size_hint_y=None,
                 height=dp(36),
                 font_size=sp(20),
+                halign="center",
             )
         )
 
-        login_input = TextInput(hint_text="Логин", multiline=False, size_hint_y=None, height=44, text="")
+        login_input = TextInput(
+            hint_text="Логин",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(44),
+        )
+
         password_input = TextInput(
             hint_text="Пароль",
             multiline=False,
             password=True,
             size_hint_y=None,
             height=dp(44),
-            text="",
         )
+
         fio_input = TextInput(
             hint_text="ФИО врача",
             multiline=False,
@@ -523,6 +544,7 @@ class DoctorDirectoryScreen(DarkScreen):
             height=dp(44),
             text="" if not is_edit else doctor.fio,
         )
+
         spec_input = TextInput(
             hint_text="Специализация",
             multiline=False,
@@ -540,18 +562,34 @@ class DoctorDirectoryScreen(DarkScreen):
             login_input.hint_text = "Новый логин (пусто = без изменений)"
             password_input.hint_text = "Новый пароль (пусто = без изменений)"
 
-        actions = BoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(44))
+        actions = BoxLayout(
+            orientation="horizontal",
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(44),
+        )
 
         def submit(*_):
             if is_edit:
                 self.run_async(
-                    update_doctor(doctor.id, fio_input.text, spec_input.text, login_input.text, password_input.text),
+                    update_doctor(
+                        doctor.id,
+                        fio_input.text,
+                        spec_input.text,
+                        login_input.text,
+                        password_input.text,
+                    ),
                     lambda *_: self._after_doctor_saved(modal, "Данные врача обновлены"),
                     lambda msg: show_modal(msg),
                 )
             else:
                 self.run_async(
-                    create_doctor(login_input.text, password_input.text, fio_input.text, spec_input.text),
+                    create_doctor(
+                        login_input.text,
+                        password_input.text,
+                        fio_input.text,
+                        spec_input.text,
+                    ),
                     lambda *_: self._after_doctor_saved(modal, "Врач добавлен"),
                     lambda msg: show_modal(msg),
                 )
@@ -564,6 +602,7 @@ class DoctorDirectoryScreen(DarkScreen):
                 on_press=submit,
             )
         )
+
         actions.add_widget(
             Button(
                 text="Отмена",
@@ -572,9 +611,13 @@ class DoctorDirectoryScreen(DarkScreen):
                 on_press=lambda *_: modal.dismiss(),
             )
         )
+
         root.add_widget(actions)
 
         modal.add_widget(root)
+
+        root.bind(size=lambda *_: setattr(modal, "size", root.size))
+
         modal.open()
 
     def _after_doctor_saved(self, modal: ModalView, message: str):

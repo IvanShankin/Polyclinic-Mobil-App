@@ -38,17 +38,19 @@ class DoctorPlaceholderScreen(DarkScreen):
                 text="Выйти",
                 background_color=self.conf.secondary_btn,
                 color=self.conf.text_color,
-                size_hint_x=0.2,
+                size_hint=(None, 1),
+                width=dp(100),
                 on_press=lambda *_: self.manager.safe_switch("auth"),
             )
         )
-        top.add_widget(Label(text="Кабинет врача", color=self.conf.text_color, font_size=sp(22)))
+        top.add_widget(Label(text=" ", color=self.conf.text_color, font_size=sp(22)))
         top.add_widget(
             Button(
                 text="Обновить",
                 background_color=self.conf.primary_btn,
                 color=self.conf.text_color,
-                size_hint_x=0.25,
+                size_hint=(None, 1),
+                width=dp(110),
                 on_press=lambda *_: self.refresh(),
             )
         )
@@ -114,7 +116,7 @@ class DoctorPlaceholderScreen(DarkScreen):
         appointments = self._filtered()
 
         if not appointments:
-            self.list_layout.add_widget(Label(text="Приёмов нет", color=self.conf.hint_color, size_hint_y=None, height=40))
+            self.list_layout.add_widget(Label(text="Приёмов нет", color=self.conf.hint_color, size_hint_y=None, height=dp(40)))
             self.set_message("Приёмы не найдены")
             return
 
@@ -174,13 +176,13 @@ def open_appointment_modal(parent, appointment: AppointmentView, role: StorageSt
     conclusion.disabled = not can_edit
     status.disabled = not can_edit
 
-    root.add_widget(Label(text="Жалобы", color=conf.text_color, size_hint_y=None, height=24))
+    root.add_widget(Label(text="Жалобы", color=conf.text_color, size_hint_y=None, height=dp(24)))
     root.add_widget(complaint)
-    root.add_widget(Label(text="Состояние", color=conf.text_color, size_hint_y=None, height=24))
+    root.add_widget(Label(text="Состояние", color=conf.text_color, size_hint_y=None, height=dp(24)))
     root.add_widget(condition)
-    root.add_widget(Label(text="Заключение", color=conf.text_color, size_hint_y=None, height=24))
+    root.add_widget(Label(text="Заключение", color=conf.text_color, size_hint_y=None, height=dp(24)))
     root.add_widget(conclusion)
-    root.add_widget(Label(text="Статус", color=conf.text_color, size_hint_y=None, height=24))
+    root.add_widget(Label(text="Статус", color=conf.text_color, size_hint_y=None, height=dp(24)))
     root.add_widget(status)
 
     actions = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))

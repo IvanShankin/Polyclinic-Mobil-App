@@ -4,21 +4,20 @@ from asyncio import AbstractEventLoop
 from pathlib import Path
 from typing import Tuple
 
+from kivy.app import App
 from pydantic import BaseModel
 
 
 def get_base_dir() -> Path:
-    """
-    Возвращает правильную базовую директорию:
-    - dev режим → root_dir
-    - exe режим → папка где лежит exe
-    """
-    if getattr(sys, "frozen", False):
-        # exe режим
-        return Path(sys.executable).parent
-    else:
-        # dev режим
-        return Path(__file__).resolve().parents[3]
+    try:
+        app = App.get_running_app()
+        if app:
+            return Path(app.user_data_dir)
+    except Exception:
+        pass
+
+    # fallback для dev режима
+    return Path(__file__).resolve().parents[3]
 
 
 class Config(BaseModel):
