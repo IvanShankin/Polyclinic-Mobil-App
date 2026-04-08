@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
+from src.service.database.core.crypto import decrypt_text, encrypt_text
 from src.service.database.core.database import get_db
 from src.service.database.models import (
     User,
@@ -69,46 +70,91 @@ async def register_patient(login: str, password: str, fio: str, phone: str) -> A
         raise ServiceError("Переданы не все данные")
 
     async with get_db() as db:
-        user = User(login=login.strip(), password=hash_password(password), role=StorageStatus.PATIENT)
+        user = User(
+            login=encrypt_text(login.strip()),
+            password=encrypt_text(hash_password(password)),
+            role=StorageStatus.PATIENT,
+        )
         db.add(user)
         try:
             db.flush()
-            db.add(Patient(user_id=user.id, fio=fio.strip(), phone=phone.strip()))
+            db.add(
+                Patient(
+                    user_id=user.id,
+                    fio=encrypt_text(fio.strip()),
+                    phone=encrypt_text(phone.strip()),
+                )
+            )
             db.commit()
         except IntegrityError:
             db.rollback()
             raise ServiceError("Логин уже занят")
 
-        return AuthPayload(user_id=user.id, role=user.role, login=user.login)
+        return AuthPayload(
+            user_id=user.id,
+            role=user.role,
+            login=decrypt_text(user.login) or "",
+        )
 
 
 async def login_user(login: str, password: str) -> AuthPayload:
     async with get_db() as db:
-        user = db.query(User).filter(User.login == login.strip()).one_or_none()
+        encrypted_login = encrypt_text(login.strip())
+        user = db.query(User).filter(User.login == encrypted_login).one_or_none()
+
+        if user is None:
+            user = db.query(User).filter(User.login == login.strip()).one_or_none()
+            if user is not None:
+                decrypted_password = decrypt_text(user.password) or ""
+                user.login = encrypted_login
+                user.password = encrypt_text(decrypted_password)
+                db.commit()
 
         if user is None or user.role == StorageStatus.DELETED:
             raise ServiceError("Пользователь не найден")
 
-        if not verify_password(password, user.password):
+        stored_password = decrypt_text(user.password) or ""
+        if not verify_password(password, stored_password):
             raise ServiceError("Неверный пароль")
 
-        return AuthPayload(user_id=user.id, role=user.role, login=user.login)
+        return AuthPayload(
+            user_id=user.id,
+            role=user.role,
+            login=decrypt_text(user.login) or "",
+        )
 
 
 async def get_doctors() -> list[DoctorView]:
     async with get_db() as db:
         doctors = db.query(Doctor).order_by(Doctor.fio.asc()).all()
-        return [DoctorView(id=d.id, fio=d.fio, specialization=d.specialization) for d in doctors]
+        return [
+            DoctorView(
+                id=d.id,
+                fio=decrypt_text(d.fio) or "",
+                specialization=decrypt_text(d.specialization) or "",
+            )
+            for d in doctors
+        ]
 
 
 async def create_doctor(login: str, password: str, fio: str, specialization: str) -> None:
     async with get_db() as db:
-        user = User(login=login.strip(), password=hash_password(password), role=StorageStatus.DOCTOR)
+        user = User(
+            login=encrypt_text(login.strip()),
+            password=encrypt_text(hash_password(password)),
+            role=StorageStatus.DOCTOR,
+        )
         db.add(user)
 
         try:
             db.flush()
-            db.add(Doctor(user_id=user.id, fio=fio.strip(), specialization=specialization.strip()))
+            db.add(
+                Doctor(
+                    user_id=user.id,
+                    fio=encrypt_text(fio.strip()),
+                    specialization=encrypt_text(specialization.strip()),
+                )
+            )
             db.commit()
         except IntegrityError:
             db.rollback()
@@ -132,14 +178,14 @@ async def update_doctor(
         if doctor is None:
             raise ServiceError("Врач не найден")
 
-        doctor.fio = fio.strip()
-        doctor.specialization = specialization.strip()
+        doctor.fio = encrypt_text(fio.strip())
+        doctor.specialization = encrypt_text(specialization.strip())
 
         if login is not None and login.strip():
-            doctor.user.login = login.strip()
+            doctor.user.login = encrypt_text(login.strip())
 
         if password is not None and password.strip():
-            doctor.user.password = hash_password(password.strip())
+            doctor.user.password = encrypt_text(hash_password(password.strip()))
 
         try:
             db.commit()
@@ -192,9 +238,9 @@ async def create_appointment(patient_user_id: int, doctor_id: int, dt: datetime)
                 doctor_id=doctor_id,
                 patient_id=patient.id,
                 datetime=dt,
-                complaint="",
-                condition="",
-                conclusion="",
+                complaint=encrypt_text(""),
+                condition=encrypt_text(""),
+                conclusion=encrypt_text(""),
                 status=AppointmentStatus.SCHEDULED,
             )
         )
@@ -218,13 +264,13 @@ async def get_patient_appointments(patient_user_id: int) -> list[AppointmentView
         return [
             AppointmentView(
                 id=a.id,
-                doctor_fio=a.doctor.fio,
-                patient_fio=a.patient.fio,
+                doctor_fio=decrypt_text(a.doctor.fio) or "",
+                patient_fio=decrypt_text(a.patient.fio) or "",
                 dt=a.datetime,
                 status=a.status,
-                complaint=a.complaint or "",
-                condition=a.condition or "",
-                conclusion=a.conclusion or "",
+                complaint=decrypt_text(a.complaint) or "",
+                condition=decrypt_text(a.condition) or "",
+                conclusion=decrypt_text(a.conclusion) or "",
             )
             for a in appointments
         ]
@@ -247,13 +293,13 @@ async def get_doctor_appointments(doctor_user_id: int) -> list[AppointmentView]:
         return [
             AppointmentView(
                 id=a.id,
-                doctor_fio=a.doctor.fio,
-                patient_fio=a.patient.fio,
+                doctor_fio=decrypt_text(a.doctor.fio) or "",
+                patient_fio=decrypt_text(a.patient.fio) or "",
                 dt=a.datetime,
                 status=a.status,
-                complaint=a.complaint or "",
-                condition=a.condition or "",
-                conclusion=a.conclusion or "",
+                complaint=decrypt_text(a.complaint) or "",
+                condition=decrypt_text(a.condition) or "",
+                conclusion=decrypt_text(a.conclusion) or "",
             )
             for a in appointments
         ]
@@ -276,13 +322,13 @@ async def get_appointments_by_doctor_id(doctor_id: int) -> list[AppointmentView]
         return [
             AppointmentView(
                 id=a.id,
-                doctor_fio=a.doctor.fio,
-                patient_fio=a.patient.fio,
+                doctor_fio=decrypt_text(a.doctor.fio) or "",
+                patient_fio=decrypt_text(a.patient.fio) or "",
                 dt=a.datetime,
                 status=a.status,
-                complaint=a.complaint or "",
-                condition=a.condition or "",
-                conclusion=a.conclusion or "",
+                complaint=decrypt_text(a.complaint) or "",
+                condition=decrypt_text(a.condition) or "",
+                conclusion=decrypt_text(a.conclusion) or "",
             )
             for a in appointments
         ]
@@ -312,9 +358,9 @@ async def update_appointment_by_doctor(
         if appointment is None:
             raise ServiceError("Прием не найден")
 
-        appointment.complaint = complaint.strip()
-        appointment.condition = condition.strip()
-        appointment.conclusion = conclusion.strip()
+        appointment.complaint = encrypt_text(complaint.strip())
+        appointment.condition = encrypt_text(condition.strip())
+        appointment.conclusion = encrypt_text(conclusion.strip())
         appointment.status = status
         db.commit()
 
