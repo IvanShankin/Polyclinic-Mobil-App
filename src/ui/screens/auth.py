@@ -83,8 +83,9 @@ class AuthScreen(DarkScreen):
             sm.get_screen("patient").refresh()
             sm.safe_switch("patient")
         elif payload.role == StorageStatus.DOCTOR:
-            sm.get_screen("doctor").refresh()
-            sm.safe_switch("doctor")
+            appointments = sm.get_screen("appointments")
+            appointments.set_context(StorageStatus.DOCTOR)
+            sm.safe_switch("appointments")
 
     def _error_login(self, error, **kwargs):
         self.set_message(error)

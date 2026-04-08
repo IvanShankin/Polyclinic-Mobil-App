@@ -20,20 +20,12 @@ from src.service.database.actions import (
     delete_doctor,
     get_appointments_by_doctor_id,
     get_doctors,
-    get_patient_appointments,
     update_doctor,
 )
 from src.service.database.models import AppointmentStatus, StorageStatus
 from src.ui.screens.base import DarkScreen
 from src.ui.screens.modal_window.modal_with_ok import show_modal
 from src.ui.screens.modal_window.modal_yes_or_no import show_confirm_modal
-
-STATUS_LABELS = {
-    AppointmentStatus.SCHEDULED: "Запланирован",
-    AppointmentStatus.COMPLETED: "Завершён",
-    AppointmentStatus.CANCELLED: "Отменён",
-}
-
 
 class DoctorDirectoryScreen(DarkScreen):
     def __init__(self, role: StorageStatus, **kwargs):
@@ -326,7 +318,7 @@ class DoctorDirectoryScreen(DarkScreen):
             current = day_start
             while current <= day_end:
                 slots.append(current)
-                current += timedelta(minutes=30)
+                current += timedelta(minutes=15)
             return slots
 
         def refresh_slots():
@@ -431,11 +423,9 @@ class DoctorDirectoryScreen(DarkScreen):
         show_modal("Вы успешно записаны")
 
     def _open_patient_appointments(self):
-        self.run_async(
-            get_patient_appointments(self.manager.current_user_id),
-            lambda appointments: self._show_appointments_modal(appointments, "Мои приёмы", StorageStatus.PATIENT),
-            lambda msg: show_modal(msg),
-        )
+        screen = self.manager.get_screen("appointments")
+        screen.set_context(StorageStatus.PATIENT)
+        self.manager.safe_switch("appointments")
 
     def _open_admin_doctor_appointments(self):
         doctor = self._selected_doctor()
@@ -443,54 +433,9 @@ class DoctorDirectoryScreen(DarkScreen):
             show_modal("Выберите врача")
             return
 
-        self.run_async(
-            get_appointments_by_doctor_id(doctor.id),
-            lambda appointments: self._show_appointments_modal(
-                appointments,
-                f"Приёмы врача: {doctor.fio}",
-                StorageStatus.ADMIN,
-            ),
-            lambda msg: show_modal(msg),
-        )
-
-    def _show_appointments_modal(self, appointments: list[AppointmentView], title: str, role: StorageStatus):
-        modal = ModalView(size_hint=(0.9, 0.85), auto_dismiss=False)
-        root = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(12))
-        root.add_widget(Label(text=title, color=self.conf.text_color, size_hint_y=None, height=dp(34), font_size=sp(20)))
-
-        scroll = ScrollView()
-        list_layout = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_y=None)
-        list_layout.bind(minimum_height=list_layout.setter("height"))
-        scroll.add_widget(list_layout)
-
-        if not appointments:
-            list_layout.add_widget(Label(text="Записей пока нет", color=self.conf.hint_color, size_hint_y=None, height=dp(34)))
-
-        for appointment in appointments:
-            status_label = STATUS_LABELS.get(appointment.status, appointment.status.value)
-            btn = Button(
-                text=f"{appointment.dt.strftime('%d.%m.%Y %H:%M')} | {appointment.doctor_fio} | {status_label}",
-                size_hint_y=None,
-                height=dp(48),
-                background_color=self.conf.secondary_btn,
-                color=self.conf.text_color,
-                on_press=lambda _, a=appointment, r=role: self._open_appointment_details(a, r),
-            )
-            list_layout.add_widget(btn)
-
-        root.add_widget(scroll)
-        root.add_widget(
-            Button(
-                text="Закрыть",
-                size_hint_y=None,
-                height=dp(44),
-                on_press=lambda *_: modal.dismiss(),
-                background_color=self.conf.secondary_btn,
-                color=self.conf.text_color,
-            )
-        )
-        modal.add_widget(root)
-        modal.open()
+        screen = self.manager.get_screen("appointments")
+        screen.set_context(StorageStatus.ADMIN, doctor_id=doctor.id, doctor_name=doctor.fio)
+        self.manager.safe_switch("appointments")
 
     def _open_doctor_form(self, doctor: DoctorView | None = None):
         is_edit = doctor is not None
@@ -643,8 +588,3 @@ class DoctorDirectoryScreen(DarkScreen):
     def _after_delete(self):
         self.refresh()
         show_modal("Врач удален")
-
-    def _open_appointment_details(self, appointment: AppointmentView, role: StorageStatus):
-        from src.ui.screens.doctor_placeholder import open_appointment_modal
-
-        open_appointment_modal(parent=self, appointment=appointment, role=role, on_saved=None)
