@@ -335,6 +335,17 @@ class DoctorDirectoryScreen(DarkScreen):
                 selected_dt["value"] = None
                 selected_label.text = "Выберите время приёма"
 
+            if day_value.weekday() in (5, 6):
+                slots_grid.add_widget(
+                    Label(
+                        text="Выходной",
+                        size_hint_y=None,
+                        height=dp(36),
+                        color=self.conf.hint_color,
+                    )
+                )
+                return
+
             for slot in build_day_slots(day_value):
                 is_occupied = slot in occupied_slots
 
