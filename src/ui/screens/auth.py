@@ -133,7 +133,7 @@ class RegisterScreen(DarkScreen):
                                background_color=self.conf.primary_btn, color=self.conf.text_color,
                                on_press=self.register))
 
-        form.add_widget(Button(text="Назад", size_hint_y=None, height=dp(45),
+        form.add_widget(Button(text="Назад", font_size="12sp",size_hint_y=None, height=dp(45),
                                background_color=self.conf.secondary_btn, color=self.conf.text_color,
                                on_press=lambda *_: self.manager.safe_switch("auth")))
 

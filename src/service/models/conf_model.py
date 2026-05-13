@@ -27,8 +27,6 @@ class Config(BaseModel):
     log_file: Path = media / "mobile_app.log"
     data_base_path: Path = media / "data_base.sqlite3"
 
-    global_event_loop: AbstractEventLoop
-
     dark_bg: Tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1)
     input_dg: Tuple[float, float, float, float] = (0.25, 0.25, 0.25, 1)
     primary_btn: Tuple[float, float, float, float] = (0.3, 0.6, 0.9, 1)

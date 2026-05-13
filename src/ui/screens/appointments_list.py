@@ -46,6 +46,7 @@ class AppointmentListScreen(DarkScreen):
         self.back_btn = Button(
             text="Выйти",
             size_hint_x=0.2,
+            font_size="12sp",
             background_color=self.conf.secondary_btn,
             color=self.conf.text_color,
             on_press=self._on_back,
@@ -53,7 +54,7 @@ class AppointmentListScreen(DarkScreen):
         self.title_label = Label(
             text=self._context_caption,
             color=self.conf.text_color,
-            font_size=sp(22),
+            font_size=sp(10),
             bold=True,
             halign="center",
             valign="middle",
@@ -61,6 +62,7 @@ class AppointmentListScreen(DarkScreen):
         self.refresh_btn = Button(
             text="Обновить",
             size_hint_x=0.25,
+            font_size="12sp",
             background_color=self.conf.primary_btn,
             color=self.conf.text_color,
             on_press=lambda *_: self.refresh(),
@@ -95,7 +97,7 @@ class AppointmentListScreen(DarkScreen):
         self._context_role = role
         self._context_doctor_id = doctor_id
         if role == StorageStatus.ADMIN:
-            self._context_caption = f"Записи врача: {doctor_name or '...'}"
+            self._context_caption = f"Записи врача: \n{doctor_name or '...'}"
         else:
             self._context_caption = "Мои приёмы"
         self.title_label.text = self._context_caption

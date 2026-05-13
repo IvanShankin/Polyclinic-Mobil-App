@@ -5,11 +5,12 @@ from asyncio import AbstractEventLoop
 from kivy.app import App
 from kivy.uix.screenmanager import FadeTransition
 
-from src.config import get_config
+from src.config import get_config, get_event_loop
 from src.service.utils.event_loop import start_loop
 from src.ui.screens.auth import AuthScreen, RegisterScreen
 from src.ui.screens.appointments_list import AppointmentListScreen
 from src.ui.screens.doctor_directory import DoctorDirectoryScreen
+from src.ui.screens.doctor_form import DoctorFormScreen
 from src.ui.screens.screen_manager import RootScreenManager
 from src.service.database.models import StorageStatus
 
@@ -20,12 +21,10 @@ class AuthApp(App):
         self.loop: AbstractEventLoop = None
 
     def build(self):
-        conf = get_config()
-
         sm = RootScreenManager(transition=FadeTransition(duration=0.15))
         self.loop = asyncio.get_event_loop()
 
-        t = threading.Thread(target=start_loop, args=(conf.global_event_loop,), daemon=True)
+        t = threading.Thread(target=start_loop, args=(get_event_loop(),), daemon=True)
         t.start()
 
         sm.add_widget(AuthScreen())
@@ -33,6 +32,7 @@ class AuthApp(App):
         sm.add_widget(DoctorDirectoryScreen(role=StorageStatus.ADMIN))
         sm.add_widget(DoctorDirectoryScreen(role=StorageStatus.PATIENT))
         sm.add_widget(AppointmentListScreen())
+        sm.add_widget(DoctorFormScreen())
 
         sm.current = "auth"
         return sm

@@ -16,11 +16,9 @@ from src.service.database.actions import (
     AppointmentView,
     DoctorView,
     create_appointment,
-    create_doctor,
     delete_doctor,
     get_appointments_by_doctor_id,
     get_doctors,
-    update_doctor,
 )
 from src.service.database.models import AppointmentStatus, StorageStatus
 from src.ui.screens.base import DarkScreen
@@ -52,6 +50,7 @@ class DoctorDirectoryScreen(DarkScreen):
             text="Выйти",
             size_hint=(None, 1),
             width=dp(100),
+            font_size="12sp",
             background_color=self.conf.secondary_btn,
             color=self.conf.text_color,
             on_press=lambda *_: self.manager.safe_switch("auth"),
@@ -60,6 +59,7 @@ class DoctorDirectoryScreen(DarkScreen):
             text="Обновить",
             size_hint=(None, 1),
             width=dp(110),
+            font_size="12sp",
             background_color=self.conf.primary_btn,
             color=self.conf.text_color,
             on_press=lambda *_: self.refresh(),
@@ -286,7 +286,7 @@ class DoctorDirectoryScreen(DarkScreen):
     def _show_book_modal(self, doctor: DoctorView, appointments: list[AppointmentView]):
         modal = ModalView(size_hint=(0.82, 0.76), auto_dismiss=False)
         root = BoxLayout(orientation="vertical", padding=dp(16), spacing=dp(10))
-        root.add_widget(Label(text=f"Запись к врачу: {doctor.fio}", color=self.conf.text_color, size_hint_y=None, height=dp(32)))
+        root.add_widget(Label(text=f"Запись к врачу: \n{doctor.fio}", color=self.conf.text_color, size_hint_y=None, height=dp(32)))
         selected_date = {"value": datetime.now().date()}
         selected_dt = {"value": None}
 
@@ -449,137 +449,9 @@ class DoctorDirectoryScreen(DarkScreen):
         self.manager.safe_switch("appointments")
 
     def _open_doctor_form(self, doctor: DoctorView | None = None):
-        is_edit = doctor is not None
-
-        modal = ModalView(
-            size_hint=(None, None),
-            auto_dismiss=False,
-            pos_hint={"center_x": 0.5, "center_y": 0.5},
-        )
-
-        root = BoxLayout(
-            orientation="vertical",
-            padding=dp(16),
-            spacing=dp(10),
-            size_hint=(None, None),
-            width=dp(400),
-        )
-
-        root.bind(minimum_height=root.setter("height"))
-
-        root.add_widget(
-            Label(
-                text="Изменение врача" if is_edit else "Добавление врача",
-                color=self.conf.text_color,
-                size_hint_y=None,
-                height=dp(36),
-                font_size=sp(20),
-                halign="center",
-            )
-        )
-
-        login_input = TextInput(
-            hint_text="Логин",
-            multiline=False,
-            size_hint_y=None,
-            height=dp(44),
-        )
-
-        password_input = TextInput(
-            hint_text="Пароль",
-            multiline=False,
-            password=True,
-            size_hint_y=None,
-            height=dp(44),
-        )
-
-        fio_input = TextInput(
-            hint_text="ФИО врача",
-            multiline=False,
-            size_hint_y=None,
-            height=dp(44),
-            text="" if not is_edit else doctor.fio,
-        )
-
-        spec_input = TextInput(
-            hint_text="Специализация",
-            multiline=False,
-            size_hint_y=None,
-            height=dp(44),
-            text="" if not is_edit else doctor.specialization,
-        )
-
-        root.add_widget(login_input)
-        root.add_widget(password_input)
-        root.add_widget(fio_input)
-        root.add_widget(spec_input)
-
-        if is_edit:
-            login_input.hint_text = "Новый логин (пусто = без изменений)"
-            password_input.hint_text = "Новый пароль (пусто = без изменений)"
-
-        actions = BoxLayout(
-            orientation="horizontal",
-            spacing=dp(8),
-            size_hint_y=None,
-            height=dp(44),
-        )
-
-        def submit(*_):
-            if is_edit:
-                self.run_async(
-                    update_doctor(
-                        doctor.id,
-                        fio_input.text,
-                        spec_input.text,
-                        login_input.text,
-                        password_input.text,
-                    ),
-                    lambda *_: self._after_doctor_saved(modal, "Данные врача обновлены"),
-                    lambda msg: show_modal(msg),
-                )
-            else:
-                self.run_async(
-                    create_doctor(
-                        login_input.text,
-                        password_input.text,
-                        fio_input.text,
-                        spec_input.text,
-                    ),
-                    lambda *_: self._after_doctor_saved(modal, "Врач добавлен"),
-                    lambda msg: show_modal(msg),
-                )
-
-        actions.add_widget(
-            Button(
-                text="Сохранить",
-                background_color=self.conf.primary_btn,
-                color=self.conf.text_color,
-                on_press=submit,
-            )
-        )
-
-        actions.add_widget(
-            Button(
-                text="Отмена",
-                background_color=self.conf.secondary_btn,
-                color=self.conf.text_color,
-                on_press=lambda *_: modal.dismiss(),
-            )
-        )
-
-        root.add_widget(actions)
-
-        modal.add_widget(root)
-
-        root.bind(size=lambda *_: setattr(modal, "size", root.size))
-
-        modal.open()
-
-    def _after_doctor_saved(self, modal: ModalView, message: str):
-        modal.dismiss()
-        self.refresh()
-        show_modal(message)
+        form_screen = self.manager.get_screen("doctor_form")
+        form_screen.prepare(doctor)
+        self.manager.safe_switch("doctor_form")
 
     def _confirm_delete(self):
         doctor = self._selected_doctor()

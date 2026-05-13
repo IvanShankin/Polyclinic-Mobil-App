@@ -1,12 +1,13 @@
 import asyncio
 
-from src.config import get_config, init_conf
+from src.config import get_config, init_conf, init_event_loop
 from src.service.database.core.filling import filling_db
 from src.service.utils.core_logger import setup_logging
 from src.ui.main_ui import AuthApp
 
 
 async def main():
+    init_event_loop()
     init_conf()
     setup_logging(get_config().log_file)
 

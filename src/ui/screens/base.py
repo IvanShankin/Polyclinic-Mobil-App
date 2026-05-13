@@ -9,7 +9,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.screenmanager import Screen
 
-from src.config import get_config
+from src.config import get_config, get_event_loop
 from src.service.exeptions import ServiceError
 
 
@@ -25,7 +25,7 @@ class BaseFormScreen(Screen):
         self.message.text = text
 
     def run_async(self, coro, on_success=None, on_error=None):
-        loop = get_config().global_event_loop
+        loop = get_event_loop()
         future: Future = asyncio.run_coroutine_threadsafe(coro, loop)
 
         def done_callback(done: Future):
